@@ -210,6 +210,8 @@ El middleware `api/src/middlewares/error.middleware.js` intercepta y estandariza
 
 ## 📸 Vistas de la Aplicación
 
+Las capturas del login, registro, ejercicios, agenda semanal y respuesta real de SQL Server, junto con la colección importable de Postman para el CRUD, están en [`evidencias_entrega/`](evidencias_entrega/).
+
 ### 1. Inicio de Sesión y Registro
 - Validación en tiempo real, hashing con bcrypt y almacenamiento seguro de token JWT en el cliente.
 - Botón rápido de credenciales demo.

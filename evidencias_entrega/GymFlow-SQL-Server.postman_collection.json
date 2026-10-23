@@ -1,0 +1,169 @@
+{
+  "info": {
+    "_postman_id": "f013cc12-0e87-46a1-a3ce-f57c638b229e",
+    "name": "GymFlow - CRUD SQL Server",
+    "description": "Pruebas del CRUD protegido de rutinas (dbo.Workouts) en SQL Server. Obtén primero un JWT desde POST {{baseUrl}}/auth/login y asígnalo a la variable token de la colección.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workoutId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Iniciar sesión (obtener JWT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tu-correo@example.com\",\n  \"password\": \"tu-contraseña\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/login",
+            "description": "Sustituye el correo y la contraseña de ejemplo por una cuenta registrada en tu aplicación. Copia response.data.token en la variable token de la colección."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login responde 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) pm.collectionVariables.set('token', json.data.token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rutinas SQL Server (CRUD)",
+      "item": [
+        {
+          "name": "Crear rutina",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rutina Postman {{$timestamp}}\",\n  \"focusMuscle\": \"Pecho\",\n  \"description\": \"Registro de ejemplo para verificar el CRUD desde Postman\",\n  \"durationMinutes\": 45\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/workouts",
+            "description": "Crea una rutina y guarda su ID en workoutId para facilitar las siguientes solicitudes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('La rutina se creó', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json?.data?.id) pm.collectionVariables.set('workoutId', String(json.data.id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar rutinas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/workouts",
+            "description": "Lista todas las filas de dbo.Workouts."
+          }
+        },
+        {
+          "name": "Obtener rutina por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/workouts/{{workoutId}}",
+            "description": "Lee una rutina por su ID en SQL Server."
+          }
+        },
+        {
+          "name": "Actualizar rutina",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rutina actualizada\",\n  \"focusMuscle\": \"Espalda\",\n  \"description\": \"Rutina actualizada desde Postman\",\n  \"durationMinutes\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/workouts/{{workoutId}}",
+            "description": "Actualiza la rutina indicada por workoutId."
+          }
+        },
+        {
+          "name": "Eliminar rutina",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/workouts/{{workoutId}}",
+            "description": "Elimina la rutina indicada por workoutId."
+          }
+        }
+      ]
+    }
+  ]
+}
