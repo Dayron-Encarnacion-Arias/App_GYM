@@ -1,0 +1,18 @@
+{
+  "name": "gymflow",
+  "version": "2.0.0",
+  "private": true,
+  "description": "GymFlow: aplicación full stack con microservicios (gateway, auth, entrenamiento, notificaciones), RabbitMQ y React",
+  "scripts": {
+    "install:all": "npm --prefix gateway install && npm --prefix servicios/auth install && npm --prefix servicios/entrenamiento install && npm --prefix servicios/notificaciones install && npm --prefix frontend install",
+    "test": "npm run test:gateway && npm run test:auth && npm run test:entrenamiento && npm run test:notificaciones && npm run test:frontend",
+    "test:gateway": "npm --prefix gateway test",
+    "test:auth": "npm --prefix servicios/auth test",
+    "test:entrenamiento": "npm --prefix servicios/entrenamiento test",
+    "test:notificaciones": "npm --prefix servicios/notificaciones test",
+    "test:frontend": "npm --prefix frontend test",
+    "up": "docker compose up --build -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f auth entrenamiento notificaciones"
+  }
+}
