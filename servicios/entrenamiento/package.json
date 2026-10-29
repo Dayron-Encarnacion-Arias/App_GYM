@@ -1,0 +1,31 @@
+{
+  "name": "gymflow-entrenamiento-service",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Servicio de negocio de GymFlow: ejercicios y agenda (MongoDB), rutinas (SQL Server) y consumo de eventos de RabbitMQ",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "mssql": "^11.0.1"
+  },
+  "optionalDependencies": {
+    "msnodesqlv8": "^4.2.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  }
+}
