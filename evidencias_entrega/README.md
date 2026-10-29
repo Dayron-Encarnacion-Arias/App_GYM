@@ -36,8 +36,8 @@ Las capturas se guardan aquí para adjuntarlas como evidencia junto con el enlac
 
 ## Colección Postman
 
-Importa `GymFlow-SQL-Server.postman_collection.json` en Postman. En la colección, configura `baseUrl` (por defecto `http://localhost:5000/api`). Ejecuta primero `Iniciar sesión (obtener JWT)` con una cuenta válida; la colección guarda el JWT automáticamente en `token`. Las solicitudes de escritura envían ese JWT como Bearer Token.
+Importa `GymFlow-SQL-Server.postman_collection.json` en Postman. En la colección, configura `baseUrl` (por defecto `http://localhost:8080/api`, el API Gateway). Ejecuta primero `Iniciar sesión (obtener JWT)` con una cuenta válida; la colección guarda el JWT automáticamente en `token`. Las solicitudes de escritura envían ese JWT como Bearer Token.
 
 Orden sugerido: `Crear rutina` → `Listar rutinas` → `Obtener rutina por ID` → `Actualizar rutina` → `Eliminar rutina`. La solicitud de creación guarda automáticamente el ID de respuesta en `workoutId` para las siguientes operaciones. Para revisar el 401, elimina temporalmente el valor de `token` y vuelve a ejecutar una solicitud protegida.
 
-El servidor API y SQL Server deben estar activos. Este recurso se almacena en SQL Server; el catálogo de ejercicios del proyecto utiliza MongoDB/Mongoose.
+El stack de Docker Compose (gateway y servicio de entrenamiento) y SQL Server deben estar activos. Este recurso se almacena en SQL Server; el catálogo de ejercicios del proyecto utiliza MongoDB/Mongoose.

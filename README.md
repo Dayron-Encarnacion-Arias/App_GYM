@@ -1,232 +1,304 @@
-# GymFlow - Aplicación Full Stack de Gestión y Planificación de Gimnasio
+# GymFlow — Plataforma de gimnasio con microservicios
 
-> **Entrega 1 - Proyecto Final Integrador**  
-> Aplicación Full Stack: API REST en Node.js conectada a **SQL Server y MongoDB**, autenticación protegida con JWT y frontend en React + Vite.
-
----
-
-## 📌 Descripción del Proyecto
-
-**GymFlow** es una plataforma integral diseñada para la organización y seguimiento de entrenamientos físicos. Permite a los usuarios:
-- **Autenticarse de forma segura:** Registro e inicio de sesión con encriptación de contraseñas (`bcrypt`) y emisión de tokens `JWT`.
-- **Planificar y agendar días de gimnasio:** Asignar rutinas específicas a los días de la semana (Lunes a Domingo), definir tiempos de duración, descansos entre series y marcar explícitamente días de descanso y recuperación.
-- **Gestionar el catálogo de ejercicios (CRUD Completo):** Crear, listar, consultar por ID, actualizar y eliminar ejercicios con grupos musculares, series, repeticiones, tiempos de descanso y niveles de dificultad.
+> **Entrega 2 — Proyecto Final Integrador (Unidades 1 a 7)**
+> Backend dividido en microservicios detrás de un API Gateway, comunicación asíncrona con RabbitMQ, una base de datos por servicio, todo levantado con Docker Compose, pruebas automatizadas y frontend en React + Vite.
 
 ---
 
-## 🛠️ Tecnologías Utilizadas
+## 📌 Descripción
 
-### Backend (`api/`)
-- **Node.js & Express:** Servidor HTTP y enrutamiento modular.
-- **SQL Server:** CRUD completo de rutinas, consultas parametrizadas y autenticación integrada de Windows.
-- **MongoDB & Mongoose:** Ejercicios y agendamientos con validaciones de esquema; Compass inspecciona la instancia local.
-- **JSON Web Tokens (`jsonwebtoken`):** Generación y validación de tokens de acceso con expiración (24h).
-- **Bcrypt.js (`bcryptjs`):** Hashing seguro de contraseñas antes del almacenamiento.
-- **Morgan & CORS:** Middleware de registro de peticiones y control de acceso HTTP.
+**GymFlow** permite a los usuarios:
 
-### Frontend (`frontend/`)
-- **React 19 + Vite:** Entorno de desarrollo ultrarrápido y reactivo.
-- **TanStack React Query (v5):** Manejo declarativo del estado del servidor, caché inteligente, `useQuery` para consultas y `useMutation` con `invalidateQueries` para actualizaciones en tiempo real sin recarga.
-- **React Router Dom (v7):** Enrutamiento SPA y protección de rutas privadas (`ProtectedRoute`).
-- **Axios:** Cliente HTTP con interceptores automáticos de cabecera `Authorization: Bearer <token>`.
-- **Lucide React:** Iconografía moderna y minimalista.
+- **Registrarse e iniciar sesión** de forma segura (contraseñas con `bcrypt`, sesión con `JWT`).
+- **Gestionar un banco de ejercicios** (CRUD completo) con grupo muscular, series, repeticiones, descanso y dificultad.
+- **Planificar su semana** (agenda de lunes a domingo con días de entrenamiento y descanso). Al registrarse, el sistema le crea automáticamente un **plan de bienvenida**.
+- **Administrar rutinas** guardadas en SQL Server (CRUD completo).
+- **Recibir notificaciones** (por ejemplo, la bienvenida generada a partir del evento de registro).
 
----
+## 🛠️ Tecnologías
 
-## 🏛️ Explicación de la Arquitectura (Unidad 3)
-
-El módulo de **Ejercicios (`api/src/modules/exercises`)** fue implementado aplicando **Arquitectura Hexagonal (Puertos y Adaptadores)** con el objetivo de desacoplar las reglas de negocio de la tecnología de persistencia y del framework web.
-
-El módulo `/api/workouts` sigue una estructura MVC modular y persiste rutinas en SQL Server. El catálogo `/api/exercises` conserva Mongoose/MongoDB y sus validaciones de esquema. Así, ambos motores se utilizan en el proyecto con responsabilidades distintas.
-
-1. **Capa de Dominio (`domain/`):** Contiene la entidad pura `Exercise` con sus invariantes y validaciones de negocio (reglas de series, repeticiones y grupos musculares), junto con el puerto `ExerciseRepositoryPort`, que define el contrato abstracto que cualquier base de datos debe cumplir.
-2. **Capa de Aplicación (`application/`):** Implementa los casos de uso específicos (`CreateExerciseUseCase`, `GetExercisesUseCase`, `GetExerciseByIdUseCase`, `UpdateExerciseUseCase`, `DeleteExerciseUseCase`). Esta capa solo interactúa con el dominio y el puerto abstracto, sin conocer detalles técnicos de la base de datos.
-3. **Capa de Infraestructura (`infrastructure/`):** Contiene los adaptadores secundarios o conducidos (`ExerciseMongoRepository`, que implementa el puerto con Mongoose) y los adaptadores primarios o conductores (`ExerciseController`, que recibe peticiones HTTP desde Express y las delega a los casos de uso).
-
-> **¿Por qué se organizó así?**  
-> Esta separación garantiza una alta mantenibilidad y testabilidad. El núcleo del negocio es completamente independiente de frameworks o bases de datos; la lógica de ejercicios no depende de Mongoose ni de Express, facilitando pruebas unitarias y posibles cambios tecnológicos en el futuro sin modificar la lógica central.
+| Capa | Tecnologías |
+| :--- | :--- |
+| Frontend | React 19, Vite, TanStack React Query v5 (`useQuery`, `useMutation`, `invalidateQueries`), React Router v7, Axios, Lucide |
+| API Gateway | Node.js 22, Express, `http-proxy-middleware`, CORS, Morgan |
+| Microservicios | Node.js 22, Express, `jsonwebtoken`, `bcryptjs`, `amqplib` |
+| Bases de datos | **PostgreSQL 16** (auth), **SQL Server** y **MongoDB** (entrenamiento), **MongoDB 7** (notificaciones) |
+| Mensajería | **RabbitMQ 3.13** (exchange `topic`, colas durables, mensajes persistentes y confirmados) |
+| Contenedores | Docker, Docker Compose, nginx (frontend) |
+| Pruebas | Jest, Supertest, Vitest, React Testing Library |
 
 ---
 
-## 📂 Estructura del Repositorio
+## 🏛️ Arquitectura
+
+```text
+                    Frontend React (nginx :3000  ·  Vite :5173)
+                                     │
+                                     │  HTTP + Authorization: Bearer <JWT>
+                                     ▼
+                         ┌───────────────────────┐
+                         │   API Gateway :8080   │   única entrada
+                         └───────────┬───────────┘
+          /api/auth                  │ /api/exercises, /schedules,      /api/notifications
+              ┌──────────────────────┤ /workouts, /members  ───────────────────┐
+              ▼                      ▼                                         ▼
+     ┌─────────────────┐   ┌──────────────────────┐              ┌──────────────────────┐
+     │  auth  :4001    │   │ entrenamiento :4002  │              │ notificaciones :4003 │
+     └───┬─────────┬───┘   └───┬─────────┬────▲───┘              └────▲────────────┬────┘
+         │         │           │         │    │                       │            │
+         ▼         │           ▼         ▼    │                       │            ▼
+   PostgreSQL      │       MongoDB   SQL Server                       │       MongoDB
+   auth_db         │       gym_app   GymFlow  │                       │       notificaciones
+   (Docker)        │       (PC)      (PC)     │                       │       (Docker)
+                   │ publica                  │ consume               │ consume
+                   ▼                          │                       │
+     ┌───────────────────────────────────────────────────────────────────────────────┐
+     │ RabbitMQ (Docker) · exchange "gymflow.events" · routing key "usuario.creado"  │
+     │   cola entrenamiento.usuario.creado        cola notificaciones.usuario.creado │
+     └───────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Servicios y su base de datos
+
+| Servicio | Carpeta | Responsabilidad | Base de datos propia |
+| :--- | :--- | :--- | :--- |
+| **API Gateway** | `gateway/` | Única entrada del frontend. Enruta por prefijo, aplica CORS, agrega `x-request-id`, responde 502 si un servicio cae y expone `/api/health`. | — |
+| **Autenticación** | `servicios/auth/` | Registro, login, perfil y emisión del JWT. Publica `usuario.creado`. | PostgreSQL `auth_db` (contenedor) |
+| **Entrenamiento** (negocio) | `servicios/entrenamiento/` | Ejercicios (arquitectura hexagonal), agenda semanal, rutinas y socios. Consume `usuario.creado`. | MongoDB `gym_app` + SQL Server `GymFlow` (instalados en la PC) |
+| **Notificaciones** | `servicios/notificaciones/` | Avisos al usuario. Consume `usuario.creado`. | MongoDB `notificaciones` (contenedor) |
+
+**Ningún servicio lee la base de datos de otro.** Los servicios de negocio no consultan a `auth` para saber quién es el usuario: verifican la firma del JWT con el secreto compartido (`JWT_SECRET`) y usan el `id` del token. Cuando necesitan datos del usuario (nombre, correo), los reciben por el evento `usuario.creado` y guardan su propia copia (colección `members` en entrenamiento).
+
+> SQL Server y el MongoDB de entrenamiento están instalados en Windows (decisión acordada con el profesor). Los contenedores llegan a ellos con `host.docker.internal`. El resto de la infraestructura (PostgreSQL, MongoDB de notificaciones y RabbitMQ) corre en Docker.
+
+### Arquitectura hexagonal
+
+- **`servicios/entrenamiento/src/modules/exercises`**: dominio (`Exercise` con sus invariantes y el puerto `ExerciseRepositoryPort`), aplicación (casos de uso `Create/Get/GetById/Update/DeleteExercise`) e infraestructura (adaptador `ExerciseMongoRepository`, controlador y rutas Express). La capa de aplicación ya no arma consultas de Mongo: entrega criterios de dominio (`{ muscleGroup, difficulty, search }`) y el adaptador decide cómo traducirlos.
+- **`servicios/auth`** sigue la misma idea: casos de uso (`RegisterUser`, `LoginUser`, `GetProfile`) que dependen de puertos (`UserRepositoryPort`, `EventPublisherPort`) implementados por adaptadores de PostgreSQL y RabbitMQ.
+
+Cada `app.js` es una fábrica `createApp({ repositorios... })`: en producción recibe los adaptadores reales y en las pruebas repositorios en memoria, sin necesidad de bases de datos.
+
+---
+
+## 📨 Evento de mensajería: `usuario.creado`
+
+| | |
+| :--- | :--- |
+| **Publica** | `auth` al registrar un usuario (también al crear el usuario demo). Exchange `gymflow.events` (tipo `topic`, durable), routing key `usuario.creado`, mensaje persistente con confirmación del broker. |
+| **Consume `entrenamiento`** | Cola `entrenamiento.usuario.creado`: guarda al usuario como **socio** (`members`) y le crea un **plan semanal de bienvenida** en su agenda. |
+| **Consume `notificaciones`** | Cola `notificaciones.usuario.creado`: guarda una **notificación de bienvenida** en su MongoDB y la "envía" (log en consola). Aparece en la campana 🔔 del frontend. |
+
+Mensaje:
+
+```json
+{
+  "event": "usuario.creado",
+  "occurredAt": "2026-10-29T15:00:00.000Z",
+  "data": { "id": "uuid", "name": "Ana Pérez", "email": "ana@gym.com", "role": "user", "createdAt": "..." }
+}
+```
+
+Ambos consumidores son **idempotentes** (si RabbitMQ entrega el mismo mensaje dos veces no se duplica nada) y hacen `ack` solo cuando terminan bien. Si `auth` no puede publicar (RabbitMQ caído), el registro no se revierte: queda registrado en el log.
+
+---
+
+## 📂 Estructura del repositorio
 
 ```text
 App_GYM/
-├── api/                             # Backend en Node.js + Express
-│   ├── src/
-│   │   ├── config/                  # Conexión a MongoDB, variables de entorno
-│   │   ├── middlewares/             # auth.middleware (JWT) y error.middleware centralizado
-│   │   ├── modules/
-│   │   │   ├── auth/                # MVC: Registro, Login, JWT, User Model
-│   │   │   ├── exercises/           # ARQUITECTURA HEXAGONAL:
-│   │   │   │   ├── domain/          # Entidad de Dominio y Puertos del Repositorio
-│   │   │   │   ├── application/     # Casos de uso (Create, Get, Update, Delete)
-│   │   │   │   └── infrastructure/  # Adaptadores (Mongo Repo, Controller, Routes)
-│   │   │   └── schedules/           # Mongoose: Agendamiento de días de gym y descansos
-│   │   ├── utils/                   # AppError, Seeder de datos iniciales
-│   │   ├── app.js                   # Configuración de Express y middlewares
-│   │   └── server.js                # Punto de entrada del servidor
-│   ├── .env.example                 # Plantilla de variables de entorno (sin secretos)
-│   └── package.json
-├── frontend/                        # Frontend en React + Vite
-│   ├── src/
-│   │   ├── components/              # Navbar, ProtectedRoute, ExerciseModal, ScheduleModal
-│   │   ├── context/                 # AuthContext (Gestión de sesión JWT)
-│   │   ├── pages/                   # LoginPage, RegisterPage, SchedulesPage, ExercisesPage
-│   │   ├── services/                # Axios API, auth, exercise y schedule services
-│   │   ├── App.jsx                  # Rutas y React Query Provider
-│   │   ├── index.css                # Estilos modernos de gimnasio
-│   │   └── main.jsx
-│   ├── .env.example
-│   └── package.json
+├── gateway/                     # API Gateway (Express + http-proxy-middleware)
+├── servicios/
+│   ├── auth/                    # Registro, login, JWT · PostgreSQL · publica usuario.creado
+│   ├── entrenamiento/           # Ejercicios (hexagonal), agenda, rutinas, socios · MongoDB + SQL Server
+│   └── notificaciones/          # Avisos · MongoDB propio · consume usuario.creado
+├── frontend/                    # React + Vite (Dockerfile con nginx)
+├── evidencias_entrega/          # Capturas y colección de Postman
+├── docker-compose.yml
+├── .env.example
+├── package.json                 # npm test ejecuta todas las pruebas
 └── README.md
 ```
 
+Cada servicio tiene su propio `package.json`, `Dockerfile`, `src/` y `tests/`.
+
 ---
 
-## 🚀 Pasos para Ejecutar el Proyecto
+## 🚀 Cómo levantar el proyecto
 
-### 1. Clonar el Repositorio
+### Requisitos
+
+- Docker Desktop.
+- Node.js 22 (solo para correr pruebas o el frontend en modo desarrollo).
+- En la PC: **SQL Server** (modo de autenticación mixto, TCP/IP en el puerto 1433) y **MongoDB** en `27017`.
+
+### 1. Variables de entorno
+
 ```bash
-git clone https://github.com/Dayron-Encarnacion-Arias/App_GYM.git
-cd App_GYM
+cp .env.example .env
 ```
 
-### 2. Bases de datos
+Cambia `JWT_SECRET` por un valor aleatorio propio. El `.env` no se sube a git.
 
-#### SQL Server (CRUD de rutinas)
+### 2. Preparar SQL Server (una sola vez)
 
-La API usa autenticación integrada de Windows; no guarda usuario ni contraseña SQL. Agrega a tu `api/.env` las variables que falten de `api/.env.example` y ajusta `SQL_SERVER` con el nombre de instancia que aparece en SSMS (por ejemplo `localhost\SQLEXPRESS` o `localhost`). Conserva los valores locales que ya tienes; no reemplaces tu `.env` completo. En SSMS, con **Windows Authentication**, crea la base de datos una vez:
+Dentro de Docker (Linux) no existe la autenticación integrada de Windows, así que el servicio de entrenamiento entra con un login SQL **con permisos solo sobre la base `GymFlow`**. En SSMS, conectado con Windows Authentication, ejecuta (cambia la contraseña por una propia):
 
 ```sql
-CREATE DATABASE GymFlow;
+IF DB_ID(N'GymFlow') IS NULL CREATE DATABASE GymFlow;
+CREATE LOGIN gymflow_app WITH PASSWORD = N'TuContraseñaSegura123', DEFAULT_DATABASE = GymFlow, CHECK_POLICY = ON;
+USE GymFlow;
+CREATE USER gymflow_app FOR LOGIN gymflow_app;
+ALTER ROLE db_datareader ADD MEMBER gymflow_app;
+ALTER ROLE db_datawriter ADD MEMBER gymflow_app;
+ALTER ROLE db_ddladmin  ADD MEMBER gymflow_app;
 ```
 
-Ejecuta `api/sql/create-workouts.sql` en SSMS, seleccionando `GymFlow`. El usuario de Windows que ejecuta Node debe tener permisos en esa base. La API también puede crear la tabla al arrancar. En Windows, `msnodesqlv8` requiere el **Microsoft ODBC Driver for SQL Server**. Se usa SQL Server instalado en Windows porque la autenticación integrada de Windows es la configuración solicitada; el contenedor de SQL Server normalmente requiere otro tipo de autenticación.
+Luego pon `SQL_USER=gymflow_app` y esa contraseña en `SQL_PASSWORD` dentro de tu `.env`. SQL Server debe estar en modo de autenticación mixto y con TCP/IP habilitado en el puerto 1433. La tabla `dbo.Workouts` la crea el servicio al conectar (también está en `servicios/entrenamiento/sql/create-workouts.sql`).
 
-#### MongoDB local / Compass
-El proyecto se conecta a MongoDB Server en `mongodb://127.0.0.1:27017/gym_app`. Puedes usar el MongoDB Server ya instalado en tu laptop: asegúrate de que el servicio `MongoDB Server` esté iniciado; `mongosh` sirve para consultar y Compass para inspeccionar la base. Mongoose es la librería de Node que usa la API.
+> Si cambias el `.env` con los contenedores ya creados, aplica los cambios con `docker compose up -d` (un `restart` no vuelve a leer el `.env`).
 
-Como alternativa, puedes iniciar MongoDB con Docker Compose desde la raíz del repositorio:
+### 3. Levantar todo
 
-```powershell
-docker compose up -d mongodb
-```
-
-Usa la instancia local o el contenedor, no ambos a la vez en el mismo puerto. Compass puede conectarse con `mongodb://127.0.0.1:27017` en cualquiera de las dos opciones.
-
-### 3. Configurar y Ejecutar el Backend (`api/`)
 ```bash
-cd api
-
-# Instalar dependencias
-npm install
-
-# Configurar api/.env: agrega las variables faltantes desde .env.example.
-# No sobrescribas tu .env existente; cambia SQL_SERVER y JWT_SECRET según tu equipo.
-
-# Iniciar en modo desarrollo
-npm run dev
+docker compose up --build
 ```
-> El servidor iniciará en `http://localhost:5000` cuando MongoDB y SQL Server estén disponibles. El archivo `api/.env` es local y está excluido por `.gitignore`; usa `api/.env.example` como plantilla y cambia `JWT_SECRET` por un valor aleatorio propio. No subas `.env`.
 
-El recurso SQL está disponible en `GET/POST /api/workouts` y `GET/PUT/DELETE /api/workouts/:id`; las escrituras requieren JWT. Los ejercicios siguen usando MongoDB/Mongoose y tienen validaciones en el esquema.
+| URL | Qué es |
+| :--- | :--- |
+| http://localhost:3000 | Frontend React (servido por nginx) |
+| http://localhost:8080/api | API Gateway (única entrada al backend) |
+| http://localhost:8080/api/health | Estado del gateway, de cada servicio y de sus bases de datos |
+| http://localhost:15672 | Panel de RabbitMQ (usuario y contraseña de `RABBITMQ_USER`/`RABBITMQ_PASSWORD`, por defecto `gymflow` / `gymflow_dev`) |
+| `localhost:5433` | PostgreSQL de auth (para inspeccionarlo con pgAdmin/DBeaver) |
+| `mongodb://localhost:27018` | MongoDB de notificaciones (para Compass) |
 
-### 4. Configurar y Ejecutar el Frontend (`frontend/`)
-En otra terminal:
+Los servicios esperan y reintentan la conexión a sus bases de datos y a RabbitMQ, así que no hace falta ningún paso manual extra. Si SQL Server no está disponible, el servicio de entrenamiento arranca igual y `/api/workouts` responde `503` hasta que conecte.
+
+Ver los eventos en vivo:
+
+```bash
+docker compose logs -f auth entrenamiento notificaciones
+```
+
+### 4. Frontend en modo desarrollo (opcional)
+
+El contenedor `frontend` ya sirve la app en el puerto 3000. Para desarrollar con recarga en caliente:
+
 ```bash
 cd frontend
-
-# Instalar dependencias
 npm install
-
-# Configurar variables de entorno
 cp .env.example .env
-
-# Iniciar servidor de desarrollo Vite
 npm run dev
 ```
-> Abre tu navegador en `http://localhost:5173`.
 
----
+Abre http://localhost:5173 (el gateway ya permite CORS para ese origen).
 
-## 🔐 Credenciales de Acceso Demo
+### Credenciales demo
 
-Para probar la aplicación inmediatamente sin necesidad de registrarte:
 - **Correo:** `demo@gymflow.com`
 - **Contraseña:** `GymPass123!`
-*(O puedes registrar una nueva cuenta con cualquier correo y contraseña de al menos 6 caracteres).*
+
+O registra una cuenta nueva: verás el plan de bienvenida en la agenda y la notificación en la campana.
 
 ---
 
-## 📡 Endpoints de la API REST
+## 🧪 Pruebas
 
-### Autenticación (`/api/auth`)
-| Método | Endpoint | Descripción | Protegida |
-| :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Registro de nuevo usuario (hashea pass con `bcrypt`) | No |
-| `POST` | `/api/auth/login` | Inicia sesión y retorna token JWT | No |
-| `GET` | `/api/auth/me` | Obtiene el perfil del usuario autenticado | **Sí (Bearer)** |
+```bash
+npm run install:all   # instala dependencias de gateway, servicios y frontend
+npm test              # ejecuta todas las pruebas
+```
 
-### Banco de Ejercicios - Arquitectura Hexagonal (`/api/exercises`)
-| Método | Endpoint | Descripción | Protegida |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/exercises` | Lista todos los ejercicios (filtros por músculo/búsqueda) | No |
-| `GET` | `/api/exercises/:id` | Obtiene un ejercicio por su ID | No |
-| `POST` | `/api/exercises` | Crea un nuevo ejercicio (valida en Dominio) | **Sí (Bearer)** |
-| `PUT` | `/api/exercises/:id` | Actualiza un ejercicio existente | **Sí (Bearer)** |
-| `DELETE` | `/api/exercises/:id` | Elimina un ejercicio | **Sí (Bearer)** |
+También se puede ejecutar cada suite por separado (`npm run test:auth`, `npm run test:entrenamiento`, etc., o `npm test` dentro de cada carpeta).
 
-### Rutinas en SQL Server (`/api/workouts`)
-| Método | Endpoint | Descripción | Protegida |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/workouts` | Lista rutinas | No |
-| `GET` | `/api/workouts/:id` | Obtiene una rutina por ID | No |
-| `POST` | `/api/workouts` | Crea una rutina | **Sí (Bearer)** |
-| `PUT` | `/api/workouts/:id` | Actualiza una rutina | **Sí (Bearer)** |
-| `DELETE` | `/api/workouts/:id` | Elimina una rutina | **Sí (Bearer)** |
-
-### Agendamiento Semanal y Descansos (`/api/schedules`)
-| Método | Endpoint | Descripción | Protegida |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/api/schedules` | Lista rutinas y descansos agendados en la semana | Opcional |
-| `GET` | `/api/schedules/:id` | Obtiene un agendamiento específico | Opcional |
-| `POST` | `/api/schedules` | Agenda un día de gym o descanso (validaciones Mongoose) | **Sí (Bearer)** |
-| `PUT` | `/api/schedules/:id` | Modifica un día agendado | **Sí (Bearer)** |
-| `DELETE` | `/api/schedules/:id` | Elimina un día agendado | **Sí (Bearer)** |
+| Suite | Herramienta | Qué cubre |
+| :--- | :--- | :--- |
+| `servicios/auth/tests/unit` | Jest | Casos de uso `RegisterUser` (hash, normalización, JWT, publicación de `usuario.creado`, 409, 400, registro con RabbitMQ caído) y `LoginUser`. |
+| `servicios/auth/tests/integration` | Supertest | `POST /register`, `POST /login`, `GET /me` **con y sin token**. |
+| `servicios/entrenamiento/tests/unit` | Jest | Entidad `Exercise` y los cinco casos de uso de ejercicios con un repositorio en memoria. |
+| `servicios/entrenamiento/tests/integration` | Supertest | `/api/exercises` (público y protegido con/sin token), CRUD de `/api/workouts`, 401 en `/api/schedules`. |
+| `servicios/notificaciones/tests` | Jest + Supertest | Caso de uso de bienvenida (idempotencia) y `/api/notifications` con/sin token. |
+| `gateway/tests` | Jest + Supertest | Enrutamiento a servicios simulados, 502 si un servicio cae, 404, CORS y `/api/health`. |
+| `frontend/src/test` | Vitest + React Testing Library | `LoginPage` (login y error), `ProtectedRoute` (redirección) y `WorkoutsPage` (`useQuery` + `useMutation` + `invalidateQueries`). |
 
 ---
 
-## 🛡️ Manejo Centralizado de Errores
+## 📡 Endpoints principales (a través del gateway `http://localhost:8080`)
 
-El middleware `api/src/middlewares/error.middleware.js` intercepta y estandariza todas las excepciones:
-- **`400 Bad Request`**: Parámetros faltantes, errores de validación de esquema en Mongoose o IDs con formato inválido.
-- **`401 Unauthorized`**: Intentar crear, editar o eliminar sin token JWT o con token vencido/alterado.
-- **`404 Not Found`**: Recursos no encontrados o endpoints inexistentes.
-- **`409 Conflict`**: Correo duplicado en registro o duplicidad de nombres de ejercicios/días ya asignados.
-- **`500 Internal Server Error`**: Errores no controlados de base de datos o servidor.
+### Autenticación → servicio `auth`
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `POST` | `/api/auth/register` | Registra un usuario, devuelve JWT y publica `usuario.creado` | No |
+| `POST` | `/api/auth/login` | Inicia sesión y devuelve JWT | No |
+| `GET` | `/api/auth/me` | Perfil del usuario autenticado | **Sí** |
+
+### Ejercicios (hexagonal, MongoDB) → servicio `entrenamiento`
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/exercises?muscleGroup=&difficulty=&search=` | Lista y filtra | No |
+| `GET` | `/api/exercises/:id` | Detalle | No |
+| `POST` | `/api/exercises` | Crea | **Sí** |
+| `PUT` | `/api/exercises/:id` | Actualiza | **Sí** |
+| `DELETE` | `/api/exercises/:id` | Elimina | **Sí** |
+
+### Rutinas (SQL Server) → servicio `entrenamiento`
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/workouts` | Lista | No |
+| `GET` | `/api/workouts/:id` | Detalle | No |
+| `POST` | `/api/workouts` | Crea | **Sí** |
+| `PUT` | `/api/workouts/:id` | Actualiza | **Sí** |
+| `DELETE` | `/api/workouts/:id` | Elimina | **Sí** |
+
+### Agenda semanal (MongoDB) → servicio `entrenamiento`
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/schedules` | Agenda del usuario del token | **Sí** |
+| `GET` | `/api/schedules/:id` | Detalle (solo si es propia) | **Sí** |
+| `POST` | `/api/schedules` | Agenda un día de entrenamiento o descanso | **Sí** |
+| `PUT` | `/api/schedules/:id` | Modifica (solo si es propia) | **Sí** |
+| `DELETE` | `/api/schedules/:id` | Elimina (solo si es propia) | **Sí** |
+| `GET` | `/api/members/me` | Perfil de socio creado por el evento `usuario.creado` | **Sí** |
+
+### Notificaciones → servicio `notificaciones`
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/notifications` | Notificaciones del usuario | **Sí** |
+| `PATCH` | `/api/notifications/:id/read` | Marca como leída | **Sí** |
+
+### Gateway
+| Método | Endpoint | Descripción | Token |
+| :--- | :--- | :--- | :---: |
+| `GET` | `/api/health` | Estado de cada servicio y de sus dependencias | No |
+
+Las rutas protegidas responden **401** sin token o con un token inválido/expirado.
 
 ---
 
-## 📸 Vistas de la Aplicación
+## 🛡️ Manejo de errores
 
-Las capturas del login, registro, ejercicios, agenda semanal y respuesta real de SQL Server, junto con la colección importable de Postman para el CRUD, están en [`evidencias_entrega/`](evidencias_entrega/).
+Cada servicio tiene un middleware de errores centralizado que responde JSON `{ success: false, message }`:
 
-### 1. Inicio de Sesión y Registro
-- Validación en tiempo real, hashing con bcrypt y almacenamiento seguro de token JWT en el cliente.
-- Botón rápido de credenciales demo.
+- **400**: validaciones de dominio, JSON mal formado, ids inválidos.
+- **401**: sin token, token alterado o expirado.
+- **404**: recurso inexistente o ajeno (la agenda de otra persona se trata como inexistente).
+- **409**: correo ya registrado o nombres duplicados.
+- **502** (gateway): el servicio destino no responde.
+- **503**: SQL Server no disponible en ese momento.
 
-### 2. Planificador Semanal (Lunes a Domingo)
-- Vista en 7 columnas mostrando rutinas asignadas, duración, tiempo de descanso entre series y etiquetas distintivas para entrenamientos vs. descansos.
-- Uso de `useQuery` para listar y `useMutation` con `invalidateQueries` para creación inmediata.
+## 🔧 Correcciones respecto a la primera entrega
 
-### 3. Banco de Ejercicios (CRUD Completo)
-- Filtrado por grupo muscular (Pecho, Espalda, Piernas, Brazos, Hombros, Core).
-- Modal interactivo para crear y actualizar ejercicios.
-- Botones de editar y eliminar con confirmación y sincronización automática.
+- La agenda (`/api/schedules`) ya no expone las rutinas de todos los usuarios sin token: ahora siempre requiere JWT y cada usuario solo ve, edita o borra lo suyo. Un `PUT` ya no permite cambiar el dueño del agendamiento.
+- Búsquedas de ejercicios: el texto del usuario se escapa antes de usarse como expresión regular.
+- La capa de aplicación del módulo hexagonal ya no depende de sintaxis de MongoDB.
+- El CRUD de SQL Server ahora también se usa desde React (página **Rutinas (SQL Server)**).
+- El rol del usuario siempre lo asigna el servidor.
 
----
+## 📸 Evidencias
+
+Capturas y la colección de Postman están en [`evidencias_entrega/`](evidencias_entrega/).
 
 ## 👨‍💻 Autor
+
 - **Dayron Encarnación Arias**
-- Repositorio Público: [GitHub - App_GYM](https://github.com/Dayron-Encarnacion-Arias/App_GYM)
+- Repositorio: [GitHub - App_GYM](https://github.com/Dayron-Encarnacion-Arias/App_GYM)
