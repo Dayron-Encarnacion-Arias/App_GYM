@@ -166,8 +166,8 @@ docker compose up --build
 | URL | Qué es |
 | :--- | :--- |
 | http://localhost:3000 | Frontend React (servido por nginx) |
-| http://localhost:8080/api | API Gateway (única entrada al backend) |
-| http://localhost:8080/api/health | Estado del gateway, de cada servicio y de sus bases de datos |
+| http://localhost:8080/api/health | API Gateway (única entrada al backend): estado del gateway, de cada servicio y de sus bases de datos |
+| http://localhost:8080/api/exercises | Ejemplo de endpoint público a través del gateway (ver la lista completa en [Endpoints](#-endpoints-principales-a-través-del-gateway-httplocalhost8080)) |
 | http://localhost:15672 | Panel de RabbitMQ (usuario y contraseña de `RABBITMQ_USER`/`RABBITMQ_PASSWORD`, por defecto `gymflow` / `gymflow_dev`) |
 | `localhost:5433` | PostgreSQL de auth (para inspeccionarlo con pgAdmin/DBeaver) |
 | `mongodb://localhost:27018` | MongoDB de notificaciones (para Compass) |
@@ -271,7 +271,7 @@ También se puede ejecutar cada suite por separado (`npm run test:auth`, `npm ru
 | :--- | :--- | :--- | :---: |
 | `GET` | `/api/health` | Estado de cada servicio y de sus dependencias | No |
 
-Las rutas protegidas responden **401** sin token o con un token inválido/expirado.
+Las rutas protegidas responden **401** sin token o con un token inválido/expirado. `/api` es solo el prefijo común: por sí sola no es un endpoint y el gateway responde 404.
 
 ---
 
