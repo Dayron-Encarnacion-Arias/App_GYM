@@ -6,11 +6,6 @@ export const exerciseService = {
     return response.data;
   },
 
-  async getExerciseById(id) {
-    const response = await api.get(`/exercises/${id}`);
-    return response.data;
-  },
-
   async createExercise(data) {
     const response = await api.post('/exercises', data);
     return response.data;

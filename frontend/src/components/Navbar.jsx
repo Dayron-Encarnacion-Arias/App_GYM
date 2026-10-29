@@ -2,7 +2,8 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Dumbbell, Calendar, LogOut, Sun, Moon } from 'lucide-react';
+import { Dumbbell, Calendar, Database, LogOut, Sun, Moon } from 'lucide-react';
+import NotificationsBell from './NotificationsBell';
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -42,6 +43,14 @@ const Navbar = () => {
               <Dumbbell size={18} />
               <span>Banco de Ejercicios (CRUD)</span>
             </NavLink>
+
+            <NavLink
+              to="/workouts"
+              className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+            >
+              <Database size={18} />
+              <span>Rutinas (SQL Server)</span>
+            </NavLink>
           </nav>
         )}
 
@@ -58,6 +67,8 @@ const Navbar = () => {
 
           {isAuthenticated ? (
             <>
+              <NotificationsBell />
+
               <div className="user-badge">
                 <div className="user-avatar">
                   {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}

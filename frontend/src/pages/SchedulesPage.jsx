@@ -37,6 +37,10 @@ const SchedulesPage = () => {
     queryKey: ['schedules', { filterRestOnly }],
     queryFn: () =>
       scheduleService.getSchedules(filterRestOnly ? { isRestDay: true } : {}),
+    // El plan de bienvenida de un usuario nuevo lo crea el servicio de entrenamiento
+    // de forma asíncrona (evento usuario.creado): mientras la agenda esté vacía se
+    // vuelve a consultar cada pocos segundos.
+    refetchInterval: (query) => (query.state.data?.data?.length ? false : 3000),
   });
 
   // Obtener lista de ejercicios para el selector en el modal

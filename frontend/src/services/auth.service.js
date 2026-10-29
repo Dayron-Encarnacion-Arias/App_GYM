@@ -10,9 +10,4 @@ export const authService = {
     const response = await api.post('/auth/register', userData);
     return response.data;
   },
-
-  async getMe() {
-    const response = await api.get('/auth/me');
-    return response.data;
-  },
 };

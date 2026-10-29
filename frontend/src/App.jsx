@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import SchedulesPage from './pages/SchedulesPage';
 import ExercisesPage from './pages/ExercisesPage';
+import WorkoutsPage from './pages/WorkoutsPage';
 
 // Configuración de TanStack React Query Client
 const queryClient = new QueryClient({
@@ -56,6 +57,14 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <ExercisesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/workouts"
+                  element={
+                    <ProtectedRoute>
+                      <WorkoutsPage />
                     </ProtectedRoute>
                   }
                 />

@@ -6,11 +6,6 @@ export const scheduleService = {
     return response.data;
   },
 
-  async getScheduleById(id) {
-    const response = await api.get(`/schedules/${id}`);
-    return response.data;
-  },
-
   async createSchedule(data) {
     const response = await api.post('/schedules', data);
     return response.data;
