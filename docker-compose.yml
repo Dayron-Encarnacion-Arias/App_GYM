@@ -1,12 +1,181 @@
+# GymFlow - microservicios
+# Levanta todo con:  docker compose up --build
+#
+# Bases de datos dentro de Docker:   PostgreSQL (auth), MongoDB (notificaciones), RabbitMQ
+# Bases de datos en la PC (host):    SQL Server y MongoDB del servicio de entrenamiento,
+#                                    accesibles desde los contenedores con host.docker.internal
+
+x-node-service: &node-service
+  restart: unless-stopped
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
 services:
-  mongodb:
+  # ---------- Infraestructura ----------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: gymflow-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-gymflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-gymflow_dev}
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Panel web: http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  auth-db:
+    image: postgres:16-alpine
+    container_name: gymflow-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${AUTH_DB_USER:-gymflow_auth}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-auth_dev_password}
+    ports:
+      - "5433:5432"     # 5433 en la PC para no chocar con otro PostgreSQL local
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  notificaciones-db:
     image: mongo:7
-    container_name: gymflow-mongodb
+    container_name: gymflow-notificaciones-db
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"   # 27018 en la PC: el 27017 lo usa el MongoDB local
     volumes:
-      - gymflow_mongo_data:/data/db
+      - notificaciones_db_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # ---------- Microservicios ----------
+  auth:
+    <<: *node-service
+    build: ./servicios/auth
+    container_name: gymflow-auth
+    environment:
+      PORT: 4001
+      NODE_ENV: ${NODE_ENV:-production}
+      AUTH_DATABASE_URL: postgres://${AUTH_DB_USER:-gymflow_auth}:${AUTH_DB_PASSWORD:-auth_dev_password}@auth-db:5432/auth_db
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-gymflow}:${RABBITMQ_PASSWORD:-gymflow_dev}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-cambia_este_secreto_en_tu_env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4001/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      # Los consumidores declaran sus colas al arrancar: auth espera a que estén listos
+      # para que el evento usuario.creado del usuario demo no se pierda en el primer arranque.
+      entrenamiento:
+        condition: service_healthy
+      notificaciones:
+        condition: service_healthy
+
+  entrenamiento:
+    <<: *node-service
+    build: ./servicios/entrenamiento
+    container_name: gymflow-entrenamiento
+    environment:
+      PORT: 4002
+      NODE_ENV: ${NODE_ENV:-production}
+      MONGO_URI: ${ENTRENAMIENTO_MONGO_URI:-mongodb://host.docker.internal:27017/gym_app}
+      SQL_AUTH: sql
+      SQL_SERVER: ${SQL_SERVER:-host.docker.internal}
+      SQL_PORT: ${SQL_PORT:-1433}
+      SQL_DATABASE: ${SQL_DATABASE:-GymFlow}
+      SQL_USER: ${SQL_USER:-gymflow_app}
+      SQL_PASSWORD: ${SQL_PASSWORD:-}
+      SQL_ENCRYPT: ${SQL_ENCRYPT:-false}
+      SQL_TRUST_SERVER_CERTIFICATE: "true"
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-gymflow}:${RABBITMQ_PASSWORD:-gymflow_dev}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-cambia_este_secreto_en_tu_env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4002/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  notificaciones:
+    <<: *node-service
+    build: ./servicios/notificaciones
+    container_name: gymflow-notificaciones
+    environment:
+      PORT: 4003
+      NODE_ENV: ${NODE_ENV:-production}
+      NOTIFICATIONS_MONGO_URI: mongodb://notificaciones-db:27017/notificaciones
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-gymflow}:${RABBITMQ_PASSWORD:-gymflow_dev}@rabbitmq:5672
+      JWT_SECRET: ${JWT_SECRET:-cambia_este_secreto_en_tu_env}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4003/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      notificaciones-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # ---------- Entrada única ----------
+  gateway:
+    <<: *node-service
+    build: ./gateway
+    container_name: gymflow-gateway
+    environment:
+      PORT: 8080
+      NODE_ENV: ${NODE_ENV:-production}
+      AUTH_SERVICE_URL: http://auth:4001
+      ENTRENAMIENTO_SERVICE_URL: http://entrenamiento:4002
+      NOTIFICACIONES_SERVICE_URL: http://notificaciones:4003
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - "8080:8080"
+    depends_on:
+      auth:
+        condition: service_healthy
+      entrenamiento:
+        condition: service_healthy
+      notificaciones:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api}
+    container_name: gymflow-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"       # http://localhost:3000
+    depends_on:
+      - gateway
 
 volumes:
-  gymflow_mongo_data:
+  rabbitmq_data:
+  auth_db_data:
+  notificaciones_db_data:
